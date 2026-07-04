@@ -20,7 +20,7 @@ KSU_BRANCH="waydroid"
 DKMS_GIT="https://aur.archlinux.org/kernelsu-dkms.git"
 MODLOADER_URL="https://github.com/shadichy/modloader/releases/download/v2.0.0/modloader-x86_64-glibc"
 REPO_URL="https://github.com/Yuu-DevID/KSU-Waydroid"
-MANAGER_URL="https://github.com/Yuu-DevID/KSU-Waydroid/releases/download/manager-build/KernelSU-Manager.apk"
+RELEASE_API="https://api.github.com/repos/Yuu-DevID/KSU-Waydroid/releases"
 INSTALL_DIR="${HOME}/.local/share/KSU-Waydroid"
 
 # root check
@@ -105,7 +105,7 @@ dkms install "kernelsu/${KSU_VER}" 2>/dev/null || dkms build "kernelsu/${KSU_VER
 # install utilities
 echo -e "${BLUE}[*] Installing utilities...${RESET}"
 install -Dm755 kernelsu-dkms/00-kernelsu.conf /etc/modprobe.d/00-kernelsu.conf 2>/dev/null || true
-install -Dm755 kernelsu-dkms/load-kernelsu.in /usr/bin/load-kernelsu 2>/dev/null || true
+install -Dm755 load-ksu /usr/bin/load-ksu
 install -Dm755 modloader /usr/bin/modloader
 
 # relax seccomp for waydroid
@@ -118,16 +118,27 @@ fi
 echo -e "${BLUE}[*] Downloading KernelSU Manager APK...${RESET}"
 mkdir -p "${INSTALL_DIR}"
 MANAGER_PATH="${INSTALL_DIR}/KernelSU-Manager.apk"
-curl -fsSL "${MANAGER_URL}" -o "${MANAGER_PATH}" 2>/dev/null || {
-  echo -e "${YELLOW}[!] Could not download manager APK from release. Build it from the workflow.${RESET}"
+
+# find latest APK asset from GitHub releases via API
+APK_URL="$(
+  curl -fsSL "${RELEASE_API}/latest" 2>/dev/null \
+    | grep -oP '"browser_download_url":\s*"\K[^"]*KernelSU[^"]*\.apk' \
+    | head -1
+)"
+
+if [[ -n "${APK_URL}" ]]; then
+  echo -e "${BLUE}[*] Found APK: ${APK_URL##*/}${RESET}"
+  curl -fsSL "${APK_URL}" -o "${MANAGER_PATH}"
+else
+  echo -e "${YELLOW}[!] Could not find manager APK in releases. Build it from the workflow.${RESET}"
   MANAGER_PATH="(not downloaded - trigger workflow build first)"
-}
+fi
 
 echo
 echo -e "${GREEN}============================================${RESET}"
 echo -e "${GREEN}[+] KernelSU Waydroid installed successfully!${RESET}"
 echo
-echo -e "${GREEN}[+] Load KernelSU:${RESET}  sudo load-kernelsu"
+echo -e "${GREEN}[+] Load KernelSU:${RESET}  sudo load-ksu"
 echo -e "${GREEN}[+] Repo:${RESET}           ${REPO_URL}"
 if [[ -f "${MANAGER_PATH}" ]]; then
   echo -e "${GREEN}[+] Manager APK:${RESET}    ${MANAGER_PATH}"
