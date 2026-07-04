@@ -1,0 +1,166 @@
+name: Build Manager (Waydroid)
+
+on:
+  push:
+    branches: [ "waydroid" ]
+    paths:
+      - 'manager/**'
+      - 'userspace/**'
+  pull_request:
+    branches: [ "waydroid" ]
+    paths:
+      - 'manager/**'
+      - 'userspace/**'
+  workflow_dispatch:
+
+jobs:
+  build-ksud:
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-linux-android
+            os: ubuntu-latest
+          - target: x86_64-linux-android
+            os: ubuntu-latest
+    uses: ./.github/workflows/ksud.yml
+    with:
+      target: ${{ matrix.target }}
+      os: ${{ matrix.os }}
+      pack_lkm: false
+      pack_ksuinit: false
+
+  build-ksud-extra:
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+    uses: ./.github/workflows/ksud.yml
+    with:
+      target: ${{ matrix.target }}
+      os: ${{ matrix.os }}
+      pack_lkm: false
+      pack_ksuinit: false
+
+  build-manager:
+    needs: build-ksud
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        spoofed: [ false ]
+
+    defaults:
+      run:
+        working-directory: ./manager
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Spoof Package ID
+        if: matrix.spoofed == true
+        run: |
+          chmod +x spoof
+          ./spoof
+
+      - name: Write key
+        run: |
+          if [ ! -z "${{ secrets.KEYSTORE }}" ]; then
+            {
+              echo KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
+              echo KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
+              echo KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
+              echo KEYSTORE_FILE='key.jks'
+            } >> gradle.properties
+            echo ${{ secrets.KEYSTORE }} | base64 -d > key.jks
+          fi
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Download arm64 ksud
+        uses: actions/download-artifact@v7
+        with:
+          name: ksud-aarch64-linux-android
+          path: .
+
+      - name: Download x86_64 ksud
+        uses: actions/download-artifact@v7
+        with:
+          name: ksud-x86_64-linux-android
+          path: .
+
+      - name: Copy ksud to app jniLibs
+        run: |
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          mkdir -p app/src/main/jniLibs/x86_64
+          cp -f ../aarch64-linux-android/release/ksud ../manager/app/src/main/jniLibs/arm64-v8a/libksud.so
+          cp -f ../x86_64-linux-android/release/ksud ../manager/app/src/main/jniLibs/x86_64/libksud.so
+
+      - name: Build with Gradle
+        run: ./gradlew clean assembleRelease
+
+      - name: Upload Manager APK
+        uses: actions/upload-artifact@v5
+        with:
+          name: KernelSU-Manager-${{ github.sha }}
+          path: manager/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Upload Manager APK (Release)
+        uses: actions/upload-artifact@v5
+        if: github.ref == 'refs/heads/waydroid' && github.event_name != 'pull_request'
+        with:
+          name: KernelSU-Manager-latest
+          path: manager/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+  push-manager-to-release:
+    needs: build-manager
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/waydroid' && github.event_name != 'pull_request'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Manager APK
+        uses: actions/download-artifact@v7
+        with:
+          name: KernelSU-Manager-latest
+          path: .
+
+      - name: Push APK to Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: manager-build
+          name: "KernelSU Manager (Waydroid)"
+          artifacts: "*.apk"
+          allowUpdates: true
+          removeArtifacts: false
+          replacesArtifacts: true
+          body: |
+            Latest KernelSU Manager APK for Waydroid.
+            Auto-built from commit ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
