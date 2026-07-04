@@ -98,9 +98,18 @@ cp -r kernelsu-dkms/{dkms.conf,Makefile} "${DKMS_DIR}" 2>/dev/null || true
 
 sed -i "s|@PKGVER@|${KSU_VER}|g; s|@KSU_GIT_VERSION@|${KSU_GIT_VER}|g;" "${DKMS_DIR}/dkms.conf"
 
+# remove old DKMS module if exists
+echo -e "${BLUE}[*] Checking for existing KernelSU DKMS module...${RESET}"
+OLD_VER="$(dkms status 2>/dev/null | grep -oP 'kernelsu/\K[^ ]+' | head -1)"
+if [[ -n "${OLD_VER}" ]]; then
+  echo -e "${YELLOW}[!] Found existing module: kernelsu/${OLD_VER}, removing...${RESET}"
+  dkms remove "kernelsu/${OLD_VER}" --all 2>/dev/null || true
+  rm -rf /usr/src/kernelsu-* /var/lib/dkms/kernelsu 2>/dev/null || true
+fi
+
 # build with dkms
 echo -e "${BLUE}[*] Building KernelSU with DKMS...${RESET}"
-dkms install "kernelsu/${KSU_VER}" 2>/dev/null || dkms build "kernelsu/${KSU_VER}"
+dkms install "kernelsu/${KSU_VER}" --force 2>/dev/null || dkms build "kernelsu/${KSU_VER}" --force
 
 # install utilities
 echo -e "${BLUE}[*] Installing utilities...${RESET}"
@@ -119,9 +128,9 @@ echo -e "${BLUE}[*] Downloading KernelSU Manager APK...${RESET}"
 mkdir -p "${INSTALL_DIR}"
 MANAGER_PATH="${INSTALL_DIR}/KernelSU-Manager.apk"
 
-# find latest APK asset from GitHub releases via API
+# find APK asset from all GitHub releases (scan both manager-build and latest tags)
 APK_URL="$(
-  curl -fsSL "${RELEASE_API}/latest" 2>/dev/null \
+  curl -fsSL "${RELEASE_API}" 2>/dev/null \
     | grep -oP '"browser_download_url":\s*"\K[^"]*KernelSU[^"]*\.apk' \
     | head -1
 )"
