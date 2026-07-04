@@ -130,10 +130,19 @@ MANAGER_PATH="${INSTALL_DIR}/KernelSU-Manager.apk"
 
 # find APK asset from all GitHub releases (scan both manager-build and latest tags)
 APK_URL="$(
-  curl -fsSL "${RELEASE_API}" 2>/dev/null \
+  curl -fsSL --retry 3 --retry-delay 2 "${RELEASE_API}" 2>/dev/null \
     | grep -oP '"browser_download_url":\s*"\K[^"]*KernelSU[^"]*\.apk' \
     | head -1
-)"
+)" || true
+
+# fallback: direct URL pattern match
+if [[ -z "${APK_URL}" ]]; then
+  APK_URL="$(
+    curl -fsSL --retry 3 --retry-delay 2 "${RELEASE_API}/tags/manager-build" 2>/dev/null \
+      | grep -oP '"browser_download_url":\s*"\K[^"]*KernelSU[^"]*\.apk' \
+      | head -1
+  )" || true
+fi
 
 if [[ -n "${APK_URL}" ]]; then
   echo -e "${BLUE}[*] Found APK: ${APK_URL##*/}${RESET}"
