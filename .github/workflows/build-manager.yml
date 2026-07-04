@@ -60,19 +60,16 @@ jobs:
         env:
           STORE_PASS: ${{ steps.gen.outputs.keystore_password }}
         run: |
-          # Export DER certificate
           keytool -exportcert \
             -alias pr-key \
             -keystore pr-key.jks \
             -storepass "$STORE_PASS" \
             -file pr-cert.der
 
-          # Calculate size in hex
           SIZE_DEC=$(stat -c%s pr-cert.der)
           SIZE_HEX=$(printf '0x%04x' "$SIZE_DEC")
           echo "expected_size=$SIZE_HEX" >> $GITHUB_OUTPUT
 
-          # Calculate SHA256 hash
           HASH=$(sha256sum pr-cert.der | awk '{print $1}')
           echo "expected_hash=$HASH" >> $GITHUB_OUTPUT
 
@@ -109,15 +106,15 @@ jobs:
     strategy:
       matrix:
         include:
-          - target: x86_64-pc-windows-gnu # windows pc
+          - target: x86_64-pc-windows-gnu
             os: ubuntu-latest
-          - target: x86_64-apple-darwin # Intel mac
+          - target: x86_64-apple-darwin
             os: macos-latest
-          - target: aarch64-apple-darwin # M chip mac
+          - target: aarch64-apple-darwin
             os: macos-latest
-          - target: aarch64-unknown-linux-musl # arm64 Linux
+          - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
-          - target: x86_64-unknown-linux-musl # x86 Linux
+          - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
     uses: ./.github/workflows/ksud.yml
     with:
@@ -128,6 +125,8 @@ jobs:
     needs: [build-ksud, generate-key]
     if: always() && needs.build-ksud.result == 'success' && needs.generate-key.result == 'success'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: ./manager
@@ -137,15 +136,6 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - name: Setup need_upload
-        id: need_upload
-        run: |
-          if [ ! -z "${{ secrets.BOT_TOKEN }}" ]; then
-            echo "UPLOAD=true" >> $GITHUB_OUTPUT
-          else
-            echo "UPLOAD=false" >> $GITHUB_OUTPUT
-          fi
 
       - name: Write key
         if: ${{ ( github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' )) || github.ref_type == 'tag' }}
@@ -228,29 +218,9 @@ jobs:
           name: "mappings"
           path: "manager/app/build/outputs/mapping/release/"
 
-      - name: Bot session cache
-        if: github.event_name != 'pull_request' && steps.need_upload.outputs.UPLOAD == 'true'
-        id: bot_session_cache
-        uses: actions/cache@v5
+      - name: Create GitHub Release
+        if: github.event_name != 'pull_request' && github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
         with:
-          path: scripts/ksubot.session
-          key: ${{ runner.os }}-bot-session
-
-      - name: Upload to telegram
-        if: github.event_name != 'pull_request' && steps.need_upload.outputs.UPLOAD == 'true'
-        env:
-          CHAT_ID: ${{ secrets.CHAT_ID }}
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          MESSAGE_THREAD_ID: ${{ secrets.MESSAGE_THREAD_ID }}
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          COMMIT_URL: ${{ github.event.head_commit.url }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TITLE: Manager
-          BRANCH: ${{ github.ref_name }}
-        run: |
-          if [ ! -z "${{ secrets.BOT_TOKEN }}" ]; then
-            export VERSION=$(git rev-list --count HEAD)
-            APK=$(find ./app/build/outputs/apk/release -name "*.apk")
-            pip3 install telethon
-            python3 $GITHUB_WORKSPACE/scripts/ksubot.py $APK
-          fi
+          files: manager/app/build/outputs/apk/release/*.apk
+          generate_release_notes: true
