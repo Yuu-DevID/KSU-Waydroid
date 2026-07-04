@@ -4,6 +4,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/version.h>
+#include <linux/hex.h>
 #ifdef CONFIG_KSU_DEBUG
 #include <linux/moduleparam.h>
 #endif
