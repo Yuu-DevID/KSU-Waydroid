@@ -114,7 +114,7 @@ dkms install "kernelsu/${KSU_VER}" --force 2>/dev/null || dkms build "kernelsu/$
 # install utilities
 echo -e "${BLUE}[*] Installing utilities...${RESET}"
 install -Dm755 kernelsu-dkms/00-kernelsu.conf /etc/modprobe.d/00-kernelsu.conf 2>/dev/null || true
-install -Dm755 load-ksu /usr/bin/load-ksu
+install -Dm755 KernelSU/load-ksu /usr/bin/load-ksu
 install -Dm755 modloader /usr/bin/modloader
 
 # relax seccomp for waydroid
