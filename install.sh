@@ -30,7 +30,7 @@ MODLOADER_URL="https://github.com/shadichy/modloader/releases/download/v2.0.0/mo
 
 REPO_URL="https://github.com/Yuu-DevID/KSU-Waydroid"
 RELEASE_API="https://api.github.com/repos/Yuu-DevID/KSU-Waydroid/releases"
-INSTALL_DIR="${HOME}/.local/share/KSU-Waydroid"
+INSTALL_DIR="${HOME}/Downloads/Waydroids"
 
 # root check
 if [[ ${EUID} != 0 ]]; then
