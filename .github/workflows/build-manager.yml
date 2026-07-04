@@ -3,6 +3,7 @@ name: Build Manager
 on:
   push:
     branches: [ "main", "dev", "ci" ]
+    tags: [ "v*" ]
     paths:
       - '.github/workflows/build-manager.yml'
       - '.github/workflows/build-lkm.yml'
@@ -21,6 +22,7 @@ on:
       - 'manager/**'
       - 'kernel/**'
       - 'userspace/**'
+  workflow_dispatch:
   workflow_call:
 
 jobs:
@@ -218,9 +220,31 @@ jobs:
           name: "mappings"
           path: "manager/app/build/outputs/mapping/release/"
 
+      - name: Determine release tag
+        id: tag
+        if: github.event_name != 'pull_request'
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "should_create_tag=false" >> $GITHUB_OUTPUT
+          else
+            TAG="v$(date +'%Y.%m.%d')-${{ github.run_number }}"
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            echo "should_create_tag=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push tag
+        if: github.event_name != 'pull_request' && steps.tag.outputs.should_create_tag == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.tag.outputs.tag }}
+          git push origin ${{ steps.tag.outputs.tag }}
+
       - name: Create GitHub Release
-        if: github.event_name != 'pull_request' && github.ref_type == 'tag'
+        if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.tag }}
           files: manager/app/build/outputs/apk/release/*.apk
           generate_release_notes: true
