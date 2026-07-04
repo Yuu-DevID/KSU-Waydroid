@@ -1,5 +1,9 @@
 #!/bin/bash
 # load-ksu: Load KernelSU kernel module for Waydroid
+#
+# Uses modloader (not insmod) to resolve symbols at runtime.
+# This is required on kernels with LTO (e.g. CachyOS bore-lto)
+# where internal symbols are not exported to modules.
 set -eu
 
 RED='\e[1;31m'
@@ -13,29 +17,48 @@ if [[ ${EUID} != 0 ]]; then
   exit 1
 fi
 
+if ! command -v modloader &>/dev/null; then
+  echo -e "${RED}[!] modloader not found. Reinstall with install.sh${RESET}"
+  exit 1
+fi
+
 echo -e "${BLUE}[*] Loading KernelSU module...${RESET}"
 
-# try modprobe first (handles .ko.zst natively on Arch)
-if modprobe kernelsu 2>/dev/null; then
-  echo -e "${GREEN}[+] KernelSU loaded via modprobe${RESET}"
+# unload first if already loaded
+if lsmod | grep -q kernelsu; then
+  rmmod kernelsu 2>/dev/null || true
+fi
+
+# find the module (try modinfo first, then manual search)
+KVERSION=$(uname -r)
+KSU_MODULE=$(modinfo kernelsu 2>/dev/null | grep filename | awk '{print $2}') || true
+[ -n "$KSU_MODULE" ] || KSU_MODULE=$(find /usr/lib/modules/"$KVERSION"/{updates,extras} -iname 'kernelsu.ko*' 2>/dev/null | head -1)
+[ -n "$KSU_MODULE" ] || KSU_MODULE=$(find /lib/modules/"$KVERSION"/{updates,extras} -iname 'kernelsu.ko*' 2>/dev/null | head -1)
+
+if [[ -z "${KSU_MODULE}" ]]; then
+  echo -e "${RED}[!] kernelsu.ko not found for kernel '${KVERSION}'. Run the installer first.${RESET}"
+  exit 1
+fi
+
+# ensure ext4 is loaded (dependency)
+if ! grep -wq ext4 /proc/modules; then
+  modprobe ext4 2>/dev/null || true
+fi
+
+# decompress and load via modloader
+case "$KSU_MODULE" in
+  *.zst) GET_CMD="zstdcat" ;;
+  *.xz)  GET_CMD="xzcat" ;;
+  *.gz)  GET_CMD="gzip -dc" ;;
+  *)     GET_CMD="cat" ;;
+esac
+
+if $GET_CMD "$KSU_MODULE" | modloader -; then
+  echo -e "${GREEN}[+] KernelSU loaded successfully${RESET}"
 else
-  # fallback: find and insmod manually (try both .ko and .ko.zst)
-  KO_PATH="$(find /lib/modules /usr/lib/modules -name 'kernelsu.ko' -o -name 'kernelsu.ko.zst' 2>/dev/null | head -1)"
-  if [[ -n "${KO_PATH}" ]]; then
-    # try normal insmod first, then force load if symbols are unresolved
-    if insmod "${KO_PATH}" 2>/dev/null; then
-      echo -e "${GREEN}[+] KernelSU loaded from: ${KO_PATH}${RESET}"
-    elif insmod -f "${KO_PATH}" 2>/dev/null; then
-      echo -e "${GREEN}[+] KernelSU force-loaded from: ${KO_PATH}${RESET}"
-    else
-      echo -e "${RED}[!] Failed to load KernelSU module. Check dmesg.${RESET}"
-      dmesg | grep -i "kernelsu" | tail -5
-      exit 1
-    fi
-  else
-    echo -e "${RED}[!] kernelsu.ko not found. Run the installer first.${RESET}"
-    exit 1
-  fi
+  echo -e "${RED}[!] Failed to load KernelSU module. Check dmesg.${RESET}"
+  dmesg | grep -i "kernelsu" | tail -5
+  exit 1
 fi
 
 # verify

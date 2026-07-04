@@ -1,6 +1,6 @@
 #!/bin/bash
 # KernelSU Waydroid installer - 1-liner for bash
-# Usage: curl -fsSL https://raw.githubusercontent.com/Yuu-DevID/KSU-Waydroid/waydroid/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/Yuu-DevID/KSU-Waydroid/waydroid/install.sh | sudo bash
 #
 # References:
 #   https://github.com/supechicken/KernelSU/tree/waydroid
@@ -18,7 +18,16 @@ WORK_DIR="${TMPDIR:-/tmp}/kernelsu-waydroid"
 KSU_GIT="https://github.com/Yuu-DevID/KSU-Waydroid.git"
 KSU_BRANCH="waydroid"
 DKMS_GIT="https://aur.archlinux.org/kernelsu-dkms.git"
-MODLOADER_URL="https://github.com/shadichy/modloader/releases/download/v2.0.0/modloader-x86_64-glibc"
+
+# detect architecture
+ARCH=$(uname -m)
+case "${ARCH}" in
+  x86_64)  MODLOADER_ARCH="x86_64-glibc" ;;
+  aarch64) MODLOADER_ARCH="aarch64-glibc" ;;
+  *)       echo -e "${RED}[!] Unsupported architecture: ${ARCH}${RESET}"; exit 1 ;;
+esac
+MODLOADER_URL="https://github.com/shadichy/modloader/releases/download/v2.0.0/modloader-${MODLOADER_ARCH}"
+
 REPO_URL="https://github.com/Yuu-DevID/KSU-Waydroid"
 RELEASE_API="https://api.github.com/repos/Yuu-DevID/KSU-Waydroid/releases"
 INSTALL_DIR="${HOME}/.local/share/KSU-Waydroid"
@@ -41,7 +50,7 @@ install_pkg() {
   if command -v apt-get &>/dev/null; then
     apt-get install -y "$@"
   elif command -v pacman &>/dev/null; then
-    pacman -S --noconfirm "$@"
+    pacman -S --needed --noconfirm "$@"
   elif command -v dnf &>/dev/null; then
     dnf install -y "$@"
   elif command -v zypper &>/dev/null; then
@@ -60,7 +69,12 @@ echo
 echo -e "${BLUE}[*] Installing dependencies...${RESET}"
 install_pkg git dkms make gcc 2>/dev/null || true
 
-# detect linux headers package
+# install zstd for .ko.zst decompression
+if ! command -v zstdcat &>/dev/null; then
+  install_pkg zstd 2>/dev/null || true
+fi
+
+# detect linux headers
 if ! ls /usr/src/linux-headers-* &>/dev/null 2>&1 && ! ls /usr/lib/modules/*/build &>/dev/null 2>&1; then
   echo -e "${YELLOW}[!] No kernel headers found. Installing headers...${RESET}"
   KERNEL_VER="$(uname -r)"
@@ -80,7 +94,7 @@ git clone "${KSU_GIT}" -b "${KSU_BRANCH}" --depth=1 KernelSU
 echo -e "${BLUE}[*] Cloning kernelsu-dkms PKGBUILD...${RESET}"
 git clone "${DKMS_GIT}" -b master --depth=1 2>/dev/null || true
 
-echo -e "${BLUE}[*] Downloading modloader...${RESET}"
+echo -e "${BLUE}[*] Downloading modloader (${MODLOADER_ARCH})...${RESET}"
 curl -fsSL "${MODLOADER_URL}" -o modloader
 chmod +x modloader
 
@@ -105,7 +119,7 @@ fi
 
 # remove old DKMS module if exists
 echo -e "${BLUE}[*] Checking for existing KernelSU DKMS module...${RESET}"
-OLD_VER="$(dkms status 2>/dev/null | grep -oP 'kernelsu/\K[^ ]+' | head -1)"
+OLD_VER="$(dkms status 2>/dev/null | grep -oP 'kernelsu/\K[^ ]+' | head -1)" || true
 if [[ -n "${OLD_VER}" ]]; then
   echo -e "${YELLOW}[!] Found existing module: kernelsu/${OLD_VER}, removing...${RESET}"
   dkms remove "kernelsu/${OLD_VER}" --all 2>/dev/null || true
@@ -118,7 +132,12 @@ dkms install "kernelsu/${KSU_VER}"
 
 # install utilities
 echo -e "${BLUE}[*] Installing utilities...${RESET}"
-install -Dm755 kernelsu-dkms/00-kernelsu.conf /etc/modprobe.d/00-kernelsu.conf 2>/dev/null || true
+
+# create modprobe alias config inline
+cat > /etc/modprobe.d/00-kernelsu.conf << 'EOF'
+alias ksu kernelsu
+EOF
+
 install -Dm755 KernelSU/load-ksu /usr/bin/load-ksu
 install -Dm755 modloader /usr/bin/modloader
 
