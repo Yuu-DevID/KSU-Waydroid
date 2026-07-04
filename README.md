@@ -5,7 +5,7 @@ KernelSU for Waydroid — built from [supechicken/KernelSU](https://github.com/s
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Yuu-DevID/KSU-Waydroid/waydroid/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Yuu-DevID/KSU-Waydroid/refs/heads/waydroid/install.sh | sudo bash
 ```
 
 ## Load KernelSU
