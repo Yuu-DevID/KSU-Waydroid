@@ -15,7 +15,7 @@ BLUE='\e[1;34m'
 RESET='\e[0m'
 
 WORK_DIR="${TMPDIR:-/tmp}/kernelsu-waydroid"
-KSU_GIT="https://github.com/supechicken/KernelSU.git"
+KSU_GIT="https://github.com/Yuu-DevID/KSU-Waydroid.git"
 KSU_BRANCH="waydroid"
 DKMS_GIT="https://aur.archlinux.org/kernelsu-dkms.git"
 MODLOADER_URL="https://github.com/shadichy/modloader/releases/download/v2.0.0/modloader-x86_64-glibc"
