@@ -19,19 +19,6 @@
 #include "app_profile.h"
 #include "klog.h" // IWYU pragma: keep
 
-/* bin2hex was removed in newer kernels, provide a compat shim */
-#ifndef bin2hex
-static inline char *bin2hex(char *buf, const void *x, size_t nbytes)
-{
-	const unsigned char *src = x;
-	size_t i;
-
-	for (i = 0; i < nbytes; i++)
-		sprintf(buf + i * 2, "%02x", src[i]);
-	return buf;
-}
-#endif
-
 struct sdesc {
     struct shash_desc shash;
     char ctx[];

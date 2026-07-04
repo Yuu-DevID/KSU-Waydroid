@@ -98,6 +98,11 @@ cp -r kernelsu-dkms/{dkms.conf,Makefile} "${DKMS_DIR}" 2>/dev/null || true
 
 sed -i "s|@PKGVER@|${KSU_VER}|g; s|@KSU_GIT_VERSION@|${KSU_GIT_VER}|g;" "${DKMS_DIR}/dkms.conf"
 
+# fix missing hex.h include for newer kernels (provides bin2hex)
+if ! grep -q 'linux/hex.h' "${DKMS_DIR}/apk_sign.c" 2>/dev/null; then
+  sed -i '5a #include <linux/hex.h>' "${DKMS_DIR}/apk_sign.c"
+fi
+
 # remove old DKMS module if exists
 echo -e "${BLUE}[*] Checking for existing KernelSU DKMS module...${RESET}"
 OLD_VER="$(dkms status 2>/dev/null | grep -oP 'kernelsu/\K[^ ]+' | head -1)"
@@ -109,7 +114,7 @@ fi
 
 # build with dkms
 echo -e "${BLUE}[*] Building KernelSU with DKMS...${RESET}"
-dkms install "kernelsu/${KSU_VER}" --force 2>/dev/null || dkms build "kernelsu/${KSU_VER}" --force
+dkms install "kernelsu/${KSU_VER}"
 
 # install utilities
 echo -e "${BLUE}[*] Installing utilities...${RESET}"
