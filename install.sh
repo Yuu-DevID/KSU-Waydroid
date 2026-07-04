@@ -75,7 +75,7 @@ mkdir -p "${WORK_DIR}"
 cd "${WORK_DIR}"
 
 echo -e "${BLUE}[*] Cloning KernelSU (waydroid branch)...${RESET}"
-git clone "${KSU_GIT}" -b "${KSU_BRANCH}" --depth=1
+git clone "${KSU_GIT}" -b "${KSU_BRANCH}" --depth=1 KernelSU
 
 echo -e "${BLUE}[*] Cloning kernelsu-dkms PKGBUILD...${RESET}"
 git clone "${DKMS_GIT}" -b master --depth=1 2>/dev/null || true
