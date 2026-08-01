@@ -135,7 +135,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -168,25 +168,25 @@ jobs:
           } >> gradle.properties
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v5.6.0
         with:
           distribution: temurin
           java-version: 21
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Download arm64 ksud
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: ksud-aarch64-linux-android
           path: .
 
       - name: Download x86_64 ksud
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: ksud-x86_64-linux-android
           path: .
@@ -208,13 +208,13 @@ jobs:
 
       - name: Upload build artifact
         if: ${{ github.event_name == 'pull_request' || (github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) || github.ref_type == 'tag' }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: manager
           path: manager/app/build/outputs/apk/release/*.apk
 
       - name: Upload mappings
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: ${{ ( github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' )) || github.ref_type == 'tag' }}
         with:
           name: "mappings"
@@ -243,7 +243,7 @@ jobs:
 
       - name: Create GitHub Release
         if: github.event_name != 'pull_request'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           files: manager/app/build/outputs/apk/release/*.apk
