@@ -16,7 +16,7 @@ rust-embed = { version = "8", features = [
     "compression", # must clean build after updating binaries
 ] }
 which = "8"
-sha1 = "0.10"
+sha1 = "0.11"
 sha256 = "1"
 tempfile = "3"
 chrono = "0.4"
@@ -35,7 +35,7 @@ zip = { version = "8",  features = [
     "lzma",
     "xz",
 ], default-features = false }
-zip-extensions = { version = "0.13", features = [
+zip-extensions = { version = "0.14", features = [
     "deflate",
     "lzma",
     "xz",
@@ -46,7 +46,7 @@ encoding_rs = "0.8"
 humansize = "2"
 libc = "0.2"
 extattr = "1"
-jwalk = "0.8"
+jwalk = "0.9"
 is_executable = "1"
 nom = "8"
 derive-new = "0.7"
