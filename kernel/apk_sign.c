@@ -341,7 +341,7 @@ int get_pkg_from_apk_path(char *pkg, const char *path)
         return -1;
 
     // Copying the package name
-    strncpy(pkg, second_last_slash + 1, pkg_len);
+    strscpy(pkg, second_last_slash + 1, pkg_len + 1);
     pkg[pkg_len] = '\0';
 
     return 0;
